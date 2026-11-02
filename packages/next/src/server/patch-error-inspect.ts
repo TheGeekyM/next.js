@@ -13,6 +13,7 @@ import {
 import { parseStack, type StackFrame } from './lib/parse-stack'
 import type { IgnorableStackFrame } from '../next-devtools/server/shared'
 import { workUnitAsyncStorage } from './app-render/work-unit-async-storage.external'
+import { getErrorOwnerStack } from './error-owner-stack'
 import { dim, italic, stdoutIsTerminal } from '../lib/picocolors'
 
 type FindSourceMapPayload = (
@@ -548,6 +549,50 @@ function parseAndSourceMap(
   }
 
   ignoreListAnonymousStackFramesIfSandwiched(sourceMappedFrames)
+
+  const hasLocatedFrame = sourceMappedFrames.some(
+    (frame) =>
+      !frame.stack.ignored &&
+      frame.stack.file !== null &&
+      frame.stack.line1 !== null
+  )
+  const ownerStack = getErrorOwnerStack(error)
+
+  if (!hasLocatedFrame && ownerStack) {
+    const ownerStackFrames: SourceMappedFrame[] = []
+
+    for (const frame of parseStack(ownerStack)) {
+      ownerStackFrames.push(
+        frame.file === null
+          ? {
+              code: null,
+              stack: {
+                file: frame.file,
+                line1: frame.line1,
+                column1: frame.column1,
+                methodName: frame.methodName,
+                arguments: frame.arguments,
+                ignored: false,
+              },
+            }
+          : getSourcemappedFrameIfPossible(
+              frame as SourcemappableStackFrame,
+              sourceMapCache,
+              inspectOptions
+            )
+      )
+    }
+
+    ignoreListAnonymousStackFramesIfSandwiched(ownerStackFrames)
+    sourceMappedFrames.unshift(...ownerStackFrames)
+
+    for (const frame of ownerStackFrames) {
+      if (!frame.stack.ignored && frame.code !== null) {
+        sourceFrame = frame.code
+        break
+      }
+    }
+  }
 
   let sourceMappedStack = ''
   for (let i = 0; i < sourceMappedFrames.length; i++) {
