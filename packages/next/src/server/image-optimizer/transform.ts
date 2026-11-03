@@ -23,6 +23,7 @@ import {
 import { getImageEtag } from './extract-etag'
 import { getMaxAge } from './get-max-age'
 import { ImageError } from './image-error'
+import { isNsioEnabled, nsioOptimizeImage } from './nsio'
 
 export { ImageError }
 export { getMaxAge }
@@ -55,6 +56,7 @@ export type ImageOptimizerTransformConfig = {
     | 'imgOptSequentialRead'
     | 'imgOptTimeoutInSeconds'
     | 'imgOptMozjpeg'
+    | 'imgOptSafeImageOptimization'
   >
   images: Pick<
     NextConfigComplete['images'],
@@ -281,18 +283,33 @@ export async function imageOptimizerTransform(
   }
 
   try {
-    let optimizedBuffer = await optimizeImage({
-      buffer: upstreamBuffer,
-      contentType,
-      quality,
-      width,
-      concurrency: nextConfig.experimental.imgOptConcurrency,
-      operationCache: nextConfig.experimental.imgOptOperationCache,
-      limitInputPixels: nextConfig.experimental.imgOptMaxInputPixels,
-      sequentialRead: nextConfig.experimental.imgOptSequentialRead,
-      timeoutInSeconds: nextConfig.experimental.imgOptTimeoutInSeconds,
-      mozjpeg: nextConfig.experimental.imgOptMozjpeg,
-    })
+    let optimizedBuffer = isNsioEnabled(
+      nextConfig.experimental.imgOptSafeImageOptimization,
+      'image'
+    )
+      ? await nsioOptimizeImage({
+          buffer: upstreamBuffer,
+          contentType,
+          quality,
+          width,
+          concurrency: nextConfig.experimental.imgOptConcurrency,
+          limitInputPixels: nextConfig.experimental.imgOptMaxInputPixels,
+          timeoutInSeconds: nextConfig.experimental.imgOptTimeoutInSeconds,
+          mozjpeg: nextConfig.experimental.imgOptMozjpeg,
+          dangerouslyAllowSVG: nextConfig.images.dangerouslyAllowSVG,
+        })
+      : await optimizeImage({
+          buffer: upstreamBuffer,
+          contentType,
+          quality,
+          width,
+          concurrency: nextConfig.experimental.imgOptConcurrency,
+          operationCache: nextConfig.experimental.imgOptOperationCache,
+          limitInputPixels: nextConfig.experimental.imgOptMaxInputPixels,
+          sequentialRead: nextConfig.experimental.imgOptSequentialRead,
+          timeoutInSeconds: nextConfig.experimental.imgOptTimeoutInSeconds,
+          mozjpeg: nextConfig.experimental.imgOptMozjpeg,
+        })
     if (opts.handleDevOutput) {
       const output = await opts.handleDevOutput(optimizedBuffer, contentType)
       optimizedBuffer = output.buffer

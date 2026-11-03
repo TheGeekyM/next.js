@@ -55,6 +55,7 @@ import { extractEtag, getHash } from './image-optimizer/extract-etag'
 import { getPreviouslyCachedImageOrNull } from './image-optimizer/get-previously-cached-image-or-null'
 import { getImageSize } from './image-optimizer/get-image-size'
 import { ImageError } from './image-optimizer/image-error'
+import { isNsioEnabled, NSIO_OUTPUT_TYPES } from './image-optimizer/nsio'
 
 // `next-server.ts` destructures `ImageError` from this module to check
 // `instanceof` on errors thrown by the transform.
@@ -101,6 +102,10 @@ export interface ImageParamsResult {
 }
 
 function getSupportedMimeType(options: string[], accept = ''): string {
+  // With no preferences, `mediaType()` returns the client's preferred type.
+  if (options.length === 0) {
+    return ''
+  }
   const mimeType = mediaType(accept, options)
   return accept.includes(mimeType) ? mimeType : ''
 }
@@ -317,7 +322,32 @@ export class ImageOptimizerCache {
       }
     }
 
-    const mimeType = getSupportedMimeType(formats || [], req.headers['accept'])
+    let supportedFormats: string[] = formats || []
+    if (
+      isNsioEnabled(
+        nextConfig.experimental.imgOptSafeImageOptimization,
+        'image'
+      )
+    ) {
+      // Negotiate here rather than in the transform, so that the cache key
+      // matches the format that is actually served.
+      const unsupportedFormats = supportedFormats.filter(
+        (format) => !NSIO_OUTPUT_TYPES.includes(format)
+      )
+      if (unsupportedFormats.length > 0) {
+        Log.warnOnce(
+          `Ignoring "images.formats" that are not supported with "experimental.imgOptSafeImageOptimization": ${unsupportedFormats.join(', ')}`
+        )
+        supportedFormats = supportedFormats.filter((format) =>
+          NSIO_OUTPUT_TYPES.includes(format)
+        )
+      }
+    }
+
+    const mimeType = getSupportedMimeType(
+      supportedFormats,
+      req.headers['accept']
+    )
 
     const isStatic =
       url.startsWith(`${nextConfig.basePath || ''}/_next/static/media`) ||
@@ -1059,6 +1089,7 @@ export async function imageOptimizer(
       | 'imgOptSequentialRead'
       | 'imgOptTimeoutInSeconds'
       | 'imgOptMozjpeg'
+      | 'imgOptSafeImageOptimization'
     >
     images: Pick<
       NextConfigComplete['images'],

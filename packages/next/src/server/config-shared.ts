@@ -657,6 +657,40 @@ export interface ExperimentalConfig {
   imgOptMaxInputPixels?: number
   imgOptSequentialRead?: boolean | null
   imgOptMozjpeg?: boolean
+  /**
+   * Uses `@next/safe-image-optimization` instead of `sharp`. This adds some
+   * additional security features to the decoder, but it supports less image
+   * formats, and may sacrifice some performance.
+   *
+   * `true` enables it everywhere. An object enables it individually for
+   * `next/image` (`image`, default `true`) and `ImageResponse`
+   * (`imageResponse`, default `false`).
+   *
+   * Currently, only `image` is implemented. `imageResponse` has no effect yet.
+   *
+   * Compared to `sharp`, for `next/image`:
+   * - Only WebP, PNG, JPEG, and GIF output are supported. Other formats in
+   *   `images.formats` (i.e. AVIF) are ignored (with a warning).
+   * - There's no operation cache, so `imgOptOperationCache` is ignored.
+   * - `imgOptSequentialRead` is ignored.
+   * - `imgOptConcurrency` is the number of worker processes, rather than the
+   *   size of libvips's thread pool.
+   * - Uses [`resvg`] instead of [`librsvg`]. Some SVGs generated with
+   *   [`ImageResponse`] may render differently in some edge cases. `resvg`
+   *   supports different SVG features and may have different bugs than
+   *   `librsvg`.
+   *
+   * [`resvg`]: https://github.com/linebender/resvg
+   * [`librsvg`]: https://gitlab.gnome.org/GNOME/librsvg
+   *
+   * @default false
+   */
+  imgOptSafeImageOptimization?:
+    | boolean
+    | {
+        image?: boolean
+        imageResponse?: boolean
+      }
   optimisticClientCache?: boolean
   /**
    * @deprecated use config.expireTime instead
@@ -2489,6 +2523,7 @@ export const defaultConfig = Object.freeze({
     imgOptMaxInputPixels: 268_402_689, // https://sharp.pixelplumbing.com/api-constructor#:~:text=%5Boptions.limitInputPixels%5D
     imgOptSequentialRead: null,
     imgOptMozjpeg: true,
+    imgOptSafeImageOptimization: false,
     isrFlushToDisk: true,
     workerThreads: false,
     proxyTimeout: undefined,
@@ -2664,6 +2699,7 @@ export interface NextConfigRuntime {
     | 'imgOptSequentialRead'
     | 'imgOptTimeoutInSeconds'
     | 'imgOptMozjpeg'
+    | 'imgOptSafeImageOptimization'
     | 'proxyClientMaxBodySize'
     | 'proxyTimeout'
     | 'testProxy'
@@ -2738,6 +2774,7 @@ export function getNextConfigRuntime(
     imgOptSequentialRead: ex.imgOptSequentialRead,
     imgOptTimeoutInSeconds: ex.imgOptTimeoutInSeconds,
     imgOptMozjpeg: ex.imgOptMozjpeg,
+    imgOptSafeImageOptimization: ex.imgOptSafeImageOptimization,
     proxyClientMaxBodySize: ex.proxyClientMaxBodySize,
     proxyTimeout: ex.proxyTimeout,
     testProxy: ex.testProxy,

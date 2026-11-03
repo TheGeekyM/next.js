@@ -92,18 +92,36 @@ Validates an upstream image, optimizes it with sharp, and returns the result wit
 
 #### nextConfig
 
-| Field                                 | Type              | Description                                                               |
-| ------------------------------------- | ----------------- | ------------------------------------------------------------------------- |
-| `images.dangerouslyAllowSVG`          | `boolean`         | Allows SVG sources. When `false`, an SVG source throws an `ImageError`.   |
-| `images.minimumCacheTTL`              | `number`          | The minimum `maxAge` of the result, in seconds.                           |
-| `experimental.imgOptConcurrency`      | `number \| null`  | The sharp thread pool size. `null` selects a default based on `NODE_ENV`. |
-| `experimental.imgOptOperationCache`   | `boolean \| null` | Enables or disables the libvips operation cache.                          |
-| `experimental.imgOptMaxInputPixels`   | `number`          | Passed to sharp as `limitInputPixels`. Default `268402689`.               |
-| `experimental.imgOptSequentialRead`   | `boolean \| null` | Passed to sharp as `sequentialRead`.                                      |
-| `experimental.imgOptTimeoutInSeconds` | `number`          | Per-image processing timeout. Default `7`.                                |
-| `experimental.imgOptMozjpeg`          | `boolean`         | Encodes JPEG output with mozjpeg. Default `true`.                         |
+| Field                                      | Type                | Description                                                                       |
+| ------------------------------------------ | ------------------- | --------------------------------------------------------------------------------- |
+| `images.dangerouslyAllowSVG`               | `boolean`           | Allows SVG sources. When `false`, an SVG source throws an `ImageError`.           |
+| `images.minimumCacheTTL`                   | `number`            | The minimum `maxAge` of the result, in seconds.                                   |
+| `experimental.imgOptConcurrency`           | `number \| null`    | The sharp thread pool size. `null` selects a default based on `NODE_ENV`.         |
+| `experimental.imgOptOperationCache`        | `boolean \| null`   | Enables or disables the libvips operation cache.                                  |
+| `experimental.imgOptMaxInputPixels`        | `number`            | Passed to sharp as `limitInputPixels`. Default `268402689`.                       |
+| `experimental.imgOptSequentialRead`        | `boolean \| null`   | Passed to sharp as `sequentialRead`.                                              |
+| `experimental.imgOptTimeoutInSeconds`      | `number`            | Per-image processing timeout. Default `7`.                                        |
+| `experimental.imgOptMozjpeg`               | `boolean`           | Encodes JPEG output with mozjpeg. Default `true`.                                 |
+| `experimental.imgOptSafeImageOptimization` | `boolean \| object` | Optimizes with `@next/safe-image-optimization` instead of sharp. Default `false`. |
 
 See [`images` configuration](/docs/app/api-reference/config/next-config-js/images) for the `images` options.
+
+`experimental.imgOptSafeImageOptimization` accepts `true` or `false`, or an object that enables it separately for `next/image` and `ImageResponse`:
+
+```ts
+type ImgOptSafeImageOptimization =
+  | boolean
+  | {
+      /** Enables it for `next/image`. Default `true`. */
+      image?: boolean
+      /** Enables it for `ImageResponse`. Default `false`. */
+      imageResponse?: boolean
+    }
+```
+
+`imageOptimizerTransform` only reads `image`.
+
+When `@next/safe-image-optimization` is used, only WebP, PNG, JPEG, and GIF output are supported. Requesting another output type returns the upstream image with `error` set. `experimental.imgOptConcurrency` sets the number of worker processes instead of the sharp thread pool size, and `experimental.imgOptOperationCache` and `experimental.imgOptSequentialRead` are ignored.
 
 #### opts
 
