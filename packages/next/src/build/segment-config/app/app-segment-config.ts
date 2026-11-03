@@ -169,7 +169,7 @@ const AppSegmentConfigSchema = z.object({
   /**
    * The maximum duration for the page in seconds.
    */
-  maxDuration: z.number().int().nonnegative().optional(),
+  maxDuration: z.number().int().nonnegative().max(4294967295).optional(),
 })
 
 /**

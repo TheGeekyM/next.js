@@ -36,7 +36,6 @@ describe('segment-config-precedence', () => {
               'sibling-revalidate',
               'sibling-fetch-cache',
               'sibling-dynamic-params',
-              'duration-above-u32',
               'layout-extensions',
             ].map((route) => `!app/${route}/**`),
           ].join(','),
@@ -507,19 +506,6 @@ describe('segment-config-precedence', () => {
     ).toBeDefined()
   })
 
-  // TODO: Match webpack's accepted maxDuration range instead of narrowing to u32.
-  // @force-gate !turbopack
-  it('accepts maxDuration above the u32 boundary and preserves its manifest value', async () => {
-    const $ = await next.render$('/duration-above-u32')
-    expect($('#children').text()).toBe('children')
-    const functionsConfig = await next.readJSON(
-      '.next/server/functions-config-manifest.json'
-    )
-    expect(functionsConfig.functions['/duration-above-u32']).toEqual({
-      maxDuration: 4294967296,
-    })
-  })
-
   // TODO: Use the first page extension consistently for layout selection and runtime.
   // @force-gate !turbopack
   it('uses the first page extension for both the layout and its runtime', async () => {
@@ -566,6 +552,34 @@ describe('synthetic not-found config: ignored edge exports', () => {
     )
     expect(middleware.functions['/_not-found/page']).toBeUndefined()
   })
+})
+
+describe('maxDuration upper bound', () => {
+  const { next } = nextTestSetup({
+    files: `${__dirname}/fixtures/validation`,
+    overrideFiles: {
+      'app/page.tsx': new FileRef(
+        `${__dirname}/fixtures/duration-above-u32/page.tsx`
+      ),
+    },
+    skipStart: true,
+  })
+
+  it.each([4294967296, 9007199254740991])(
+    'rejects maxDuration above the u32 boundary: %s',
+    async (value) => {
+      await next.patchFile('app/page.tsx', (content) =>
+        content.replace(
+          /export const maxDuration = \d+/,
+          `export const maxDuration = ${value}`
+        )
+      )
+      const result = await next.build()
+      expect(result.exitCode).toBe(1)
+      expect(result.cliOutput).toContain('maxDuration')
+      expect(result.cliOutput).toContain('4294967295')
+    }
+  )
 })
 
 describe('segment-config validation', () => {
